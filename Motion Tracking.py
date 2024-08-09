@@ -1,18 +1,18 @@
 import cv2
 import numpy as np
 import serial
+import math
 
-# Initial calibration offsets
-X_OFFSET = 12.5  # Initial X offset when the laser is centered
-Y_OFFSET = 19.23 # Initial Y offset when the laser is centered
+# Transformation matrix coefficients
+A = 0.1927  # Scale factor for X
+B = 0.19549999999999998  # Scale factor for Y
+C_X = -77  # Offset for X
+C_Y = 29  # Offset for Y
+#0.1825 for y
+#0.1667 for Xr
 
-# Motor units per pixel
-MOTOR_UNITS_PER_PIXEL_X = 0.1667  # Motor units per pixel in the X direction
-MOTOR_UNITS_PER_PIXEL_Y = 0.1825  # Motor units per pixel in the Y direction
-
-# Distance and bounding box sizes
-DISTANCES = [5, 10, 20]  # Distances in feet
-BOX_SIZES = [(260, 150), (140, 50), (70, 25)]  # Bounding box sizes at corresponding distances
+#A = 0.1667  # Scale factor for X
+#B = 0.1825  # Scale factor for Y
 
 # Serial communication parameters
 serial_port = 'COM3'
@@ -21,30 +21,22 @@ baud_rate = 115200
 # Background Subtractor
 bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=50, detectShadows=True)
 
-def estimate_distance(w, h):
-    # Estimate distance based on bounding box size
-    for i in range(len(DISTANCES)):
-        box_w, box_h = BOX_SIZES[i]
-        if w > box_w * 0.8 and h > box_h * 0.8:
-            return DISTANCES[i]
-    return DISTANCES[-1]  # Default to the farthest distance
+
 
 def write_to_serial(port, baudrate, avg_coords):
+    
+    new_y = 540 + (avg_coords[1]-540)* math.cos(math.degrees(1)) #to project bounding box onto a plane not 1 degree off
+
     try:
         ser = serial.Serial(port, baudrate, timeout=1)
 
-        # Calculate the distance and adjust scaling factors
-        distance = estimate_distance(avg_coords[2] - avg_coords[0], avg_coords[3] - avg_coords[1])
-        X_SCALE = MOTOR_UNITS_PER_PIXEL_X / distance
-        Y_SCALE = MOTOR_UNITS_PER_PIXEL_Y / distance
+        # Apply the transformation matrix
+        galvo_x = (A * avg_coords[0]) + C_X
+        galvo_y = (B * new_y) + C_Y
+        galvo_x = max(0, min(3000, galvo_x))  # Ensure coordinates are within galvo limits
+        galvo_y = max(0, min(3000, galvo_y))  # Ensure coordinates are within galvo limits
 
-        # Map the camera coordinates to the galvo coordinates
-        galvo_x = (avg_coords[0] * X_SCALE) + X_OFFSET
-        galvo_y = (avg_coords[1] * Y_SCALE) + Y_OFFSET
-        galvo_x = max(0, min(200, galvo_x))  # Ensure coordinates are within galvo limits
-        galvo_y = max(0, min(200, galvo_y))  # Ensure coordinates are within galvo limits
-
-        gcode_command = f"G1 X{galvo_x:.2f} Y{galvo_y:.2f} F15000\n"
+        gcode_command = f"G1 X{galvo_x:.3f} Y{galvo_y:.3f} F9000\n"
         ser.write(gcode_command.encode())
         ser.close()
         print(f"Sent to serial: {gcode_command.strip()}")
@@ -54,7 +46,7 @@ def write_to_serial(port, baudrate, avg_coords):
 def average_coordinates(minx, miny, maxx, maxy):
     avg_x = (minx + maxx) / 2
     avg_y = (miny + maxy) / 2
-    return avg_x, avg_y, maxx - minx, maxy - miny
+    return avg_x, avg_y
 
 cap = cv2.VideoCapture(0)  # Use the correct camera index
 
@@ -93,8 +85,12 @@ while True:
         avg_coords = average_coordinates(x, y, x + w, y + h)
         print(f"Average coordinates: {avg_coords}")
 
-        # Send to serial
-        write_to_serial(serial_port, baud_rate, avg_coords)
+        # Check if the average x-coordinate is within the valid range
+        if 303 <= avg_coords[0] <= 1802:
+            # Send to serial
+            write_to_serial(serial_port, baud_rate, avg_coords)
+        else:
+            print("Coordinates out of range, not sending to galvo.")
     
     cv2.imshow('webcam', frame)
 
