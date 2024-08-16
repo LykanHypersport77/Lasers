@@ -6,8 +6,8 @@ import math
 # Transformation matrix coefficients
 A = 0.1927  # Scale factor for X
 B = 0.19549999999999998  # Scale factor for Y
-C_X = -77  # Offset for X
-C_Y = 29  # Offset for Y
+C_X = -64  # Offset for X
+C_Y = 31  # Offset for Y
 #0.1825 for y
 #0.1667 for Xr
 
