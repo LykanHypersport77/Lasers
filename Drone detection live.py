@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 # Path to the trained model weights
-weights_path = r"D:\dronetraining\runs\detect\train5\weights\best.pt"
+weights_path = r"C:\Users\pkpq4\Downloads\best (1).pt"
 
 # Initialize YOLO model with the trained weights
 model = YOLO(weights_path)
