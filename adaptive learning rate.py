@@ -19,13 +19,13 @@ serial_port = 'COM3'
 baud_rate = 115200
 
 # CUDA-based Background Subtractor with adaptive learning rate
-bg_subtractor = cv2.cuda.createBackgroundSubtractorMOG2(history=100, varThreshold=300, detectShadows=True) #setting to false can speed up the process, may give false positives
+bg_subtractor = cv2.cuda.createBackgroundSubtractorMOG2(history=100, varThreshold=300, detectShadows=True) #setting to false can speed up the process, may give false positives. check line 103
 
 # Parameters for adaptive learning rate
 min_learning_rate = 1e-6
 max_learning_rate = 1e-3
 motion_threshold = 3000  # Threshold to determine if there's significant motion
-background_reset_interval = 10  # Reset background model every 10 seconds
+background_reset_interval = 10  # Reset background model every 10 seconds. This prrevents the background model from going stale and detecting everything as motion
 
 def write_to_serial(ser, avg_coords):
     new_y = 540 + (avg_coords[1] - 540) * math.cos(math.degrees(1))  # calculation for the 1 degree offset on the plane caused by camera being higher than the laser. easy transformation
@@ -100,14 +100,14 @@ def process_frame(frame, ser, last_reset_time):
 
     # Reset background model if time interval has passed
     if time.time() - last_reset_time > background_reset_interval:
-        bg_subtractor = cv2.cuda.createBackgroundSubtractorMOG2(history=100, varThreshold=300, detectShadows=True)
+        bg_subtractor = cv2.cuda.createBackgroundSubtractorMOG2(history=100, varThreshold=300, detectShadows=True) #increasing history and threshold will make it less sensitve. shadows off will increase speed
         print("Background model reset.")
         return time.time()  # Update last reset time
     return last_reset_time
 
 def main():
     cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920) #try to keep 1920 x 1080 as the previous math is based on that.
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
     ser = serial.Serial(serial_port, baud_rate, timeout=1)
