@@ -12,7 +12,7 @@ import time
 A = 0.1927
 B = 0.19549999999999998
 C_X = -64
-C_Y = 31  # use test52.py to configure depending on distance, set up for around 15 feet rn
+C_Y = 31  # use test52.py to configure depending on distance, set up for around 20 feet rn
 
 # Serial communication parameters
 serial_port = 'COM3'
@@ -24,8 +24,8 @@ bg_subtractor = cv2.cuda.createBackgroundSubtractorMOG2(history=100, varThreshol
 # Parameters for adaptive learning rate
 min_learning_rate = 1e-6
 max_learning_rate = 1e-3
-motion_threshold = 5000  # Threshold to determine if there's significant motion
-background_reset_interval = 120  # Reset background model every 2 minutes (120 seconds)
+motion_threshold = 3000  # Threshold to determine if there's significant motion
+background_reset_interval = 10  # Reset background model every 10 seconds
 
 def write_to_serial(ser, avg_coords):
     new_y = 540 + (avg_coords[1] - 540) * math.cos(math.degrees(1))  # calculation for the 1 degree offset on the plane caused by camera being higher than the laser. easy transformation
@@ -61,11 +61,20 @@ def process_frame(frame, ser, last_reset_time):
     frame_gpu = cv2.cuda_GpuMat()
     frame_gpu.upload(frame)  # processing the frame using CUDA data container
 
-    # Calculate the adaptive learning rate
-    learning_rate = calculate_learning_rate(bg_subtractor.apply(frame_gpu, learningRate=-1, stream=cv2.cuda.Stream_Null()))
+    # Apply background subtraction using CUDA
+    fg_mask_gpu = bg_subtractor.apply(frame_gpu, learningRate=-1, stream=cv2.cuda.Stream_Null())  # Apply with default learning rate
+    
+    # Download fg_mask to CPU for further processing (necessary for contour operations)
+    fg_mask = fg_mask_gpu.download()
 
-    fg_mask_gpu = bg_subtractor.apply(frame_gpu, learningRate=learning_rate, stream=cv2.cuda.Stream_Null())  # Apply with adaptive learning rate
+    # Calculate the adaptive learning rate based on CPU-processed contours
+    contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    learning_rate = calculate_learning_rate(contours)  # Calculate learning rate after downloading mask to CPU
 
+    # Apply background subtraction again using the adaptive learning rate
+    fg_mask_gpu = bg_subtractor.apply(frame_gpu, learningRate=learning_rate, stream=cv2.cuda.Stream_Null())
+
+    # Download the final mask after applying adaptive learning rate
     fg_mask = fg_mask_gpu.download()
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))  # contours and other morphology to clean up the frame
