@@ -58,7 +58,7 @@ def calculate_learning_rate(contours):
         # Calculate the total area of all contours
         total_area = sum(cv2.contourArea(c) for c in contours)
         # Adjust learning rate based on the amount of motion
-        if total_area > motion_threshold:
+        if total_area > motion_threshold: #honestly with such a fast reset time, the learning rate could be anything
             return max_learning_rate
         else:
             return min_learning_rate
@@ -113,7 +113,7 @@ def process_frame(frame, ser_galvo, ser_arduino, last_reset_time, fire_mode):
                 ser_arduino.write(b"fire_tracking\n")
                 print("Fire mode is OFF, sending tracking command")
         else:
-            print("Coordinates out of range, not sending to galvo.")
+            print("Coordinates out of range, not sending to galvo.") #see idk why its like this. its technically in reverse but for some reason it only works this way. dont wanna change it.
     else:
         # No contours detected, reset to idle mode and turn on the green light
         ser_arduino.write(b"idle\n")
@@ -135,8 +135,8 @@ def main():
 
     ser_galvo = serial.Serial(galvo_serial_port, baud_rate, timeout=1)
     ser_arduino = serial.Serial(arduino_serial_port, baud_rate, timeout=1)
-    
-    '''DEBUG STATEMENTS'''
+
+    # '''DEBUG STATEMENTS'''
     # arduino_thread = threading.Thread(target=read_arduino_output, args=(ser_arduino,))
     # arduino_thread.daemon = True  # Daemonize the thread so it exits with the program
     # arduino_thread.start()
