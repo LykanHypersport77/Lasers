@@ -3,15 +3,19 @@ int yellowLightPin = 3;
 int redLightPin = 4;
 int blueLightPin = 6;  // Fire mode light
 int buttonPin = 5;     // Pin for fire mode button
+int shootPin = 7;      // Pin to send 5V signal to shoot mechanism
 
-bool fire_mode = false;  // Fire mode state
-bool lastButtonState = HIGH;  // Store the last button state (HIGH = not pressed)
+bool fire_mode = false;          // Fire mode state
+bool lastButtonState = HIGH;     // Store the last button state (HIGH = not pressed)
+unsigned long lastFireTime = 0;  // Stores the time when the red light was last activated
+const unsigned long fireCooldown = 10000;  // 10-second cooldown for firing
 
 void setup() {
   pinMode(greenLightPin, OUTPUT);
   pinMode(yellowLightPin, OUTPUT);
   pinMode(redLightPin, OUTPUT);
   pinMode(blueLightPin, OUTPUT);
+  pinMode(shootPin, OUTPUT);      // Output pin for firing mechanism
   pinMode(buttonPin, INPUT_PULLUP);  // Use internal pull-up for button pin
 
   Serial.begin(115200);  // Initialize serial communication
@@ -40,7 +44,7 @@ void loop() {
   // Handle serial commands for tracking
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
-    Serial.print("Command received: ");
+    Serial.print("Command received: "); 
     Serial.println(command);
 
     if (command == "idle") {
@@ -49,6 +53,7 @@ void loop() {
       digitalWrite(greenLightPin, HIGH);  // Green light ON (idle)
       digitalWrite(yellowLightPin, LOW);  // Yellow light OFF (not tracking)
       digitalWrite(redLightPin, LOW);     // Red light OFF (fire mode inactive)
+      digitalWrite(shootPin, LOW);        // Turn off the shooting mechanism
     } else if (command == "tracking") {
       // Drone detected and tracking
       Serial.println("Drone detected. Tracking mode.");
@@ -61,14 +66,21 @@ void loop() {
       digitalWrite(greenLightPin, LOW);   // Green light OFF (drone detected)
       digitalWrite(yellowLightPin, HIGH); // Yellow light ON (tracking)
 
-      // If fire mode is active, turn on the red light
-      if (fire_mode) {
-        Serial.println("Fire mode is active, turning on red light.");
+      unsigned long currentTime = millis();
+      // Check if the cooldown period has passed
+      if (fire_mode && (currentTime - lastFireTime >= fireCooldown)) {
+        // If fire mode is active and cooldown period has passed, turn on the red light
+        delay(500);  // Delay to allow tracking to stabilize (500ms)
+
+        Serial.println("Fire mode is active, turning on red light and firing.");
         digitalWrite(redLightPin, HIGH);  // Red light ON (fire mode + tracking)
-      } else {
-        delay(100);// added so that the system fires 100ms after detecting drone in fire mode...hopefully
-        Serial.println("Fire mode is OFF, keeping red light off.");
-        digitalWrite(redLightPin, LOW);   // Red light OFF (no fire mode)
+        digitalWrite(shootPin, HIGH);     // Output 5V signal to shoot mechanism
+        delay(100);  // Fire for 100ms
+        digitalWrite(shootPin, LOW);      // Turn off shooting signal after firing
+        lastFireTime = currentTime;       // Reset the cooldown timer
+      } else if (fire_mode && (currentTime - lastFireTime < fireCooldown)) {
+        Serial.println("Fire cooldown in progress, cannot fire yet.");
+        digitalWrite(redLightPin, LOW);   // Red light OFF during cooldown
       }
     }
   }
