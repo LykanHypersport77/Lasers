@@ -31,7 +31,7 @@ void loop() {
     // Control the blue light based on fire mode
     digitalWrite(blueLightPin, fire_mode ? HIGH : LOW);  // Fire mode ON or OFF
 
-    delay(50);  // Debounce delay to prevent multiple toggles from one press
+    delay(100);  // Debounce delay to prevent multiple toggles from one press
   }
 
   // Update last button state
@@ -60,13 +60,13 @@ void loop() {
       Serial.println("Drone detected and fire mode is ON. Fire tracking mode.");
       digitalWrite(greenLightPin, LOW);   // Green light OFF (drone detected)
       digitalWrite(yellowLightPin, HIGH); // Yellow light ON (tracking)
-     
 
       // If fire mode is active, turn on the red light
       if (fire_mode) {
         Serial.println("Fire mode is active, turning on red light.");
         digitalWrite(redLightPin, HIGH);  // Red light ON (fire mode + tracking)
       } else {
+        delay(100);// added so that the system fires 100ms after detecting drone in fire mode...hopefully
         Serial.println("Fire mode is OFF, keeping red light off.");
         digitalWrite(redLightPin, LOW);   // Red light OFF (no fire mode)
       }
