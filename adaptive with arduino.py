@@ -32,6 +32,16 @@ motion_threshold = 10
 background_reset_interval = 10  # Reset background model every 10 seconds
 
 def write_to_galvo(ser_galvo, avg_coords):
+    '''
+    Sends G-code commands to the galvo system to aim the laser at the calculated coordinates.
+
+    Parameters:
+    - ser_galvo: The serial object used for communicating with the galvo system.
+    - avg_coords: Tuple (avg_x, avg_y) representing the average coordinates of the detected object.
+
+    Returns:
+    None
+    '''
     new_y = 540 + (avg_coords[1] - 540) * math.cos(math.radians(1))  # calculation for the 1 degree offset on the plane caused by camera being higher than the laser. easy transformation
 
     galvo_x = (A * avg_coords[0]) + C_X
@@ -44,11 +54,32 @@ def write_to_galvo(ser_galvo, avg_coords):
     print(f"Sent to serial: {gcode_command.strip()}")
 
 def average_coordinates(minx, miny, maxx, maxy):
+    """
+    Computes the average coordinates of a bounding box.
+
+    Parameters:
+    - minx: Minimum X value of the bounding box.
+    - miny: Minimum Y value of the bounding box.
+    - maxx: Maximum X value of the bounding box.
+    - maxy: Maximum Y value of the bounding box.
+
+    Returns:
+    A tuple (avg_x, avg_y) representing the average X and Y coordinates.
+    """
     avg_x = (minx + maxx) / 2
     avg_y = (miny + maxy) / 2
     return avg_x, avg_y
 
 def calculate_learning_rate(contours):
+    """
+    Calculates the adaptive learning rate based on the detected motion.
+
+    Parameters:
+    - contours: A list of contours detected in the current frame.
+
+    Returns:
+    The calculated learning rate (float) based on the total area of contours.
+    """
     if contours:
         # Calculate the total area of all contours
         total_area = sum(cv2.contourArea(c) for c in contours)
@@ -61,6 +92,18 @@ def calculate_learning_rate(contours):
         return max_learning_rate  # honestly with such a fast reset time, the learning rate could be anything
 
 def process_frame(frame, ser_galvo, ser_arduino, last_reset_time):
+    """
+    Processes the current video frame for background subtraction, object detection, and laser aiming.
+
+    Parameters:
+    - frame: The current video frame (numpy array).
+    - ser_galvo: The serial object for communication with the galvo system.
+    - ser_arduino: The serial object for communication with the Arduino.
+    - last_reset_time: The timestamp of the last background model reset.
+
+    Returns:
+    The updated timestamp of the last background reset.
+    """
     global bg_subtractor, fire_mode
     frame_gpu = cv2.cuda_GpuMat()
     frame_gpu.upload(frame) # processing the frame using CUDA data container
@@ -124,6 +167,15 @@ def process_frame(frame, ser_galvo, ser_arduino, last_reset_time):
 
 # Check if fire mode signal is received from Arduino
 def read_arduino(ser_arduino):
+    """
+    Reads signals from the Arduino to check the fire mode status.
+
+    Parameters:
+    - ser_arduino: The serial object used for communicating with the Arduino.
+
+    Returns:
+    None
+    """
     global fire_mode
     while True:
         if ser_arduino.in_waiting > 0:
@@ -139,6 +191,15 @@ def read_arduino(ser_arduino):
                 print(f"Error reading Arduino signal: {e}")
 
 def main():
+    """
+    Main function that initializes the video capture, serial connections, and starts the frame processing loop.
+
+    Parameters:
+    None
+
+    Returns:
+    None
+    """
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
@@ -149,7 +210,7 @@ def main():
     # Start a thread for reading Arduino signals
     arduino_thread = threading.Thread(target=read_arduino, args=(ser_arduino,))
     arduino_thread.daemon = True  # Daemon thread to automatically exit when the main program ends
-    arduino_thread.start()
+    arduino_thread.start() #idk who Daemon is but it worrks
 
     last_reset_time = time.time()
 
