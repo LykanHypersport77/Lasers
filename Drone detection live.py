@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 # Path to the trained model weights
-weights_path = r"C:\Users\pkpq4\Downloads\best (1).pt"
+weights_path = r"C:\Users\pkpq4\Downloads\best 15000.pt"
 
 # Initialize YOLO model with the trained weights
 model = YOLO(weights_path)
@@ -23,8 +23,29 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
 # Check if CUDA is available and use it
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = 'cuda' if torch.cuda.is_available() else 'cpu' #cpu is very slow, goes from 200ms down to 8ms when using cuda
 model.to(device)
+
+# # Function to resize the frame with padding
+# def resize_with_pad(image, new_shape, padding_color=(255, 255, 255)):
+#     """Maintains aspect ratio and resizes with padding.
+#     Params:
+#         image: Image to be resized.
+#         new_shape: Expected (width, height) of new image.
+#         padding_color: Tuple in BGR of padding color
+#     Returns:
+#         image: Resized image with padding
+#     """
+#     original_shape = (image.shape[1], image.shape[0])
+#     ratio = float(max(new_shape))/max(original_shape)
+#     new_size = tuple([int(x*ratio) for x in original_shape])
+#     image = cv2.resize(image, new_size)
+#     delta_w = new_shape[0] - new_size[0]
+#     delta_h = new_shape[1] - new_size[1]
+#     top, bottom = delta_h//2, delta_h-(delta_h//2)
+#     left, right = delta_w//2, delta_w-(delta_w//2)
+#     image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=padding_color)
+#     return image
 
 # Open the text file for logging processing times
 with open('processing_times.txt', 'w') as log_file:
@@ -47,6 +68,10 @@ with open('processing_times.txt', 'w') as log_file:
 
         # Optional preprocessing
         frame = preprocess_frame(frame)
+
+        # # Resize frame with padding
+        # frame = resize_with_pad(frame, (640, 640))
+        frame = cv2.resize(frame, (640, 640))
 
         # Measure time taken for processing
         start_time = time.time()
@@ -79,7 +104,7 @@ with open('processing_times.txt', 'w') as log_file:
             class_id = int(best_detection.cls[0])
             class_name = model.names[class_id]
 
-            if best_confidence >= 0.3:
+            if best_confidence >= 0.1:
                 # Draw the bounding box
                 cv2.rectangle(frame, (int(xmin), int(ymin)), (int(xmax), int(ymax)), (0, 255, 0), 2)
                 
@@ -92,7 +117,7 @@ with open('processing_times.txt', 'w') as log_file:
         cv2.imshow('YOLO Drone Detection', frame)
 
         # Break the loop if the 'q' key is pressed
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord('q'): #must press q if you want to save processing times to a file
             break
 
 # Release the capture and close windows
