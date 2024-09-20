@@ -1,6 +1,6 @@
-import os
-os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\bin")
-os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5")  # Ignore these, not necessary for the code. Originally put for CUDA testing
+# import os
+# os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\bin")
+# os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5")  # Ignore these, not necessary for the code. Originally put for CUDA testing
 import cv2
 import numpy as np
 import serial
@@ -11,8 +11,8 @@ import time
 # Transformation matrix coefficients
 A = 0.1927
 B = 0.19549999999999998
-C_X = -70
-C_Y = 33  # Use test52.py to configure depending on distance, set up for around 20 feet rn
+C_X = -72
+C_Y = 26  # Use test52.py to configure depending on distance, set up for around 20 feet rn
 
 # Serial communication parameters
 galvo_serial_port = 'COM3'
@@ -28,7 +28,7 @@ bg_subtractor = cv2.cuda.createBackgroundSubtractorMOG2(history=100, varThreshol
 # Parameters for adaptive learning rate
 min_learning_rate = 1e-6
 max_learning_rate = 1e-2
-motion_threshold = 10
+motion_threshold = 10 # can range from 0-9999 for motion sensitivity
 background_reset_interval = 10  # Reset background model every 10 seconds
 
 def write_to_galvo(ser_galvo, avg_coords):
@@ -37,7 +37,7 @@ def write_to_galvo(ser_galvo, avg_coords):
 
     Parameters:
     - ser_galvo: The serial object used for communicating with the galvo system.
-    - avg_coords: Tuple (avg_x, avg_y) representing the average coordinates of the detected object.
+    - avg_coords: Tuple (avg_x, avg_y) representing the average coordinates of the detected object. (pixels)
 
     Returns:
     None
@@ -58,13 +58,13 @@ def average_coordinates(minx, miny, maxx, maxy):
     Computes the average coordinates of a bounding box.
 
     Parameters:
-    - minx: Minimum X value of the bounding box.
-    - miny: Minimum Y value of the bounding box.
-    - maxx: Maximum X value of the bounding box.
-    - maxy: Maximum Y value of the bounding box.
+    - minx: Minimum X value of the bounding box. (pixels)
+    - miny: Minimum Y value of the bounding box. (pixels)
+    - maxx: Maximum X value of the bounding box. (pixels)
+    - maxy: Maximum Y value of the bounding box. (pixels)
 
     Returns:
-    A tuple (avg_x, avg_y) representing the average X and Y coordinates.
+    A tuple (avg_x, avg_y) representing the average X and Y coordinates. (pixels)
     """
     avg_x = (minx + maxx) / 2
     avg_y = (miny + maxy) / 2
@@ -87,7 +87,7 @@ def calculate_learning_rate(contours):
         if total_area > motion_threshold:
             return max_learning_rate
         else:
-            return min_learning_rate
+            return min_learning_rate 
     else:
         return max_learning_rate  # honestly with such a fast reset time, the learning rate could be anything
 
@@ -99,7 +99,7 @@ def process_frame(frame, ser_galvo, ser_arduino, last_reset_time):
     - frame: The current video frame (numpy array).
     - ser_galvo: The serial object for communication with the galvo system.
     - ser_arduino: The serial object for communication with the Arduino.
-    - last_reset_time: The timestamp of the last background model reset.
+    - last_reset_time: The timestamp of the last background model reset. (seconds)
 
     Returns:
     The updated timestamp of the last background reset.
@@ -125,10 +125,10 @@ def process_frame(frame, ser_galvo, ser_arduino, last_reset_time):
     fg_mask = fg_mask_gpu.download()
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)) # contours and other morphology to clean up the frame
-    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
+    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel) # uses a 5x5 matrix (pixels) as specified for the morphology
     fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel)
 
-    contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) 
 
     if contours:
         largest_contour = max(contours, key=cv2.contourArea)
